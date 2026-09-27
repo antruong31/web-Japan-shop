@@ -3,31 +3,41 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Test Firebase Kết Nối</title>
+    <title>Test Firebase & Hiển Thị Danh Sách</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 50px; background-color: #f4f4f9; }
-        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); max-width: 400px; }
+        body { font-family: Arial, sans-serif; margin: 40px; background-color: #f4f4f9; }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); max-width: 450px; margin-bottom: 20px; }
         input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
         button { background: #4CAF50; color: white; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; width: 100%; }
         button:hover { background: #45a049; }
-        #status { margin-top: 15px; font-weight: bold; }
+        #status { margin-top: 10px; font-weight: bold; font-size: 14px; }
+        ul { padding-left: 20px; margin-top: 10px; }
+        li { margin-bottom: 5px; color: #333; }
     </style>
 </head>
 <body>
 
     <div class="card">
         <h2>Kiểm tra Firebase Firestore</h2>
-        <p>Nhập số điện thoại để test lưu lên Database:</p>
+        <p>Nhập số điện thoại để lưu lên Database:</p>
         <input type="text" id="phoneInput" placeholder="Nhập số điện thoại...">
         <button id="submitBtn">Lưu lên Firebase</button>
         <div id="status"></div>
     </div>
 
-    <!-- Nhúng Firebase SDK phiên bản web trực tiếp -->
+    <div class="card">
+        <h3>📋 Danh sách số điện thoại đã nhập:</h3>
+        <ul id="phoneList">
+            <li>Đang tải dữ liệu...</li>
+        </ul>
+    </div>
+
+    <!-- Nhúng Firebase SDK bản chuẩn -->
     <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-    import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-        // Cấu hình kết nối lấy từ dự án Firebase của bạn
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, collection, addDoc, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        // Cấu hình kết nối Firebase
         const firebaseConfig = {
             apiKey: "AIzaSyDTeoMZbUF67rINsYSLKMaHMtds95PVOr8",
             authDomain: "japan-5e21f.firebaseapp.com",
@@ -38,14 +48,43 @@
             measurementId: "G-97RYZKLXPF"
         };
 
-        // Khởi tạo Firebase
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
         const phoneInput = document.getElementById("phoneInput");
         const submitBtn = document.getElementById("submitBtn");
         const statusDiv = document.getElementById("status");
+        const phoneList = document.getElementById("phoneList");
 
+        // Hàm tải danh sách số điện thoại từ Firestore lên màn hình
+        async function loadPhones() {
+            try {
+                phoneList.innerHTML = "<li>Đang tải dữ liệu...</li>";
+                const q = query(collection(db, "test_phones"), orderBy("createdAt", "desc"));
+                const querySnapshot = await getDocs(q);
+                
+                phoneList.innerHTML = "";
+                if (querySnapshot.empty) {
+                    phoneList.innerHTML = "<li>Chưa có số điện thoại nào được lưu.</li>";
+                    return;
+                }
+
+                querySnapshot.forEach((doc) => {
+                    const data = doc.data();
+                    const li = document.createElement("li");
+                    li.textContent = `${data.phoneNumber} (Lưu lúc: ${new Date(data.createdAt).toLocaleTimeString()})`;
+                    phoneList.appendChild(li);
+                });
+            } catch (e) {
+                console.error("Lỗi tải dữ liệu: ", e);
+                phoneList.innerHTML = "<li style='color:red;'>Lỗi tải danh sách từ Firebase.</li>";
+            }
+        }
+
+        // Tự động tải danh sách khi vừa mở trang
+        loadPhones();
+
+        // Xử lý khi bấm nút lưu
         submitBtn.addEventListener("click", async () => {
             const phone = phoneInput.value.trim();
             if (!phone) {
@@ -55,7 +94,9 @@
             }
 
             try {
-                // Đẩy dữ liệu vào bảng (collection) có tên là "test_phones" trên Firestore
+                statusDiv.style.color = "orange";
+                statusDiv.innerText = "Đang lưu lên hệ thống...";
+
                 await addDoc(collection(db, "test_phones"), {
                     phoneNumber: phone,
                     createdAt: new Date().toISOString()
@@ -64,6 +105,9 @@
                 statusDiv.style.color = "green";
                 statusDiv.innerText = " Thành công! Đã lưu số lên Firebase.";
                 phoneInput.value = "";
+
+                // Gọi lại hàm load để cập nhật ngay danh sách bên dưới
+                loadPhones();
             } catch (e) {
                 statusDiv.style.color = "red";
                 statusDiv.innerText = " Lỗi: " + e.message;
